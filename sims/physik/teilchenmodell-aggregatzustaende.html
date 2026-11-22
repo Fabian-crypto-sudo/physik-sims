@@ -1,0 +1,1253 @@
+<!--
+@id: teilchenmodell-aggregatzustaende
+@title: Teilchenmodell & Aggregatzustände
+@subject: physik
+@topic: Wärmelehre & Teilchenmodell
+@grade: Sek I
+@tags: Teilchenmodell, Aggregatzustände, Dichteanomalie, Kelvin, Absoluter Nullpunkt, Atom, Molekül
+@summary: Taktile Single-Stage-Simulation (kontinuierliche Velocity-Verlet-Molekulardynamik) im PhET-inspirierten Labor-Design: Gefäß mit Thermometer (°C/K bis 0 K), direktem Brenner/Eisbad-Regler, Wasser (H₂O), Ethanol und Argon (Einzelatom).
+@controls: Teilchen im Gefäß direkt antippen oder umrühren | Brenner/Eisbad-Hebel unter dem Gefäß hoch-/runterziehen | Thermometer antippen (°C ↔ K) | Rechts: Stoff (Wasser, Ethanol, Argon), Zustand (Fest/Flüssig/Gas), Temperatur-Slider, 1 Teilchen verfolgen, Einzelschritt
+@representations: Kontinuierliches Teilchenmodell im geschlossenen Gefäß, Thermometer (°C/K), Teilchenspur (1 verfolgtes Teilchen)
+@presets: sek1, kelvin, dichteanomalie, ethanol, argon
+-->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Teilchenmodell &amp; Aggregatzustände — physik-sims</title>
+  <style>
+    :root {
+      --bg-top: #f4f7fb;
+      --bg-mid: #e6eef7;
+      --bench: #cfdbe8;
+      --panel: rgba(255, 255, 255, 0.90);
+      --border: rgba(15, 23, 42, 0.13);
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #0284c7;
+      --accent-soft: rgba(2, 132, 199, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 78%, var(--bench) 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    #sim-canvas {
+      display: block;
+      width: 100%;
+      height: 100dvh;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      cursor: grab;
+    }
+
+    #sim-canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .rail {
+      position: fixed;
+      top: max(14px, env(safe-area-inset-top));
+      right: max(14px, env(safe-area-inset-right));
+      width: 248px;
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.09);
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      z-index: 10;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .rail.collapsed {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(16px);
+    }
+
+    @media (max-width: 720px) {
+      .rail {
+        top: auto;
+        left: 50%;
+        right: auto;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        width: min(460px, calc(100vw - 20px));
+        padding: 10px 12px;
+        gap: 8px;
+      }
+      .rail.collapsed {
+        transform: translate(-50%, 16px);
+      }
+    }
+
+    .section-lbl {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .sub-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .sub-btn {
+      min-height: 36px;
+      padding: 4px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text);
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      touch-action: manipulation;
+    }
+
+    .sub-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: #0369a1;
+    }
+
+    .state-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .state-btn {
+      min-height: 38px;
+      padding: 4px 6px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fef9c3;
+      color: #713f12;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      touch-action: manipulation;
+    }
+
+    .state-btn.active {
+      background: #fde047;
+      border-color: #ca8a04;
+      color: #422006;
+    }
+
+    .temp-box {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .temp-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .temp-head strong {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--text);
+      font-size: 0.88rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 34px;
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+      touch-action: pan-x;
+    }
+
+    .quick-row {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .quick-btn {
+      min-height: 28px;
+      padding: 0 7px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .quick-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .toggle-chip {
+      min-height: 36px;
+      width: 100%;
+      padding: 0 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      touch-action: manipulation;
+    }
+
+    .toggle-chip.active {
+      background: #fef3c7;
+      border-color: #d97706;
+      color: #92400e;
+    }
+
+    .transport {
+      display: flex;
+      gap: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .t-btn {
+      min-height: 38px;
+      flex: 1;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text);
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .t-btn.primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+      flex: 1.4;
+    }
+
+    .t-btn:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    .hud-fab {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      min-height: 36px;
+      padding: 0 11px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 10;
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="sim-canvas" aria-label="Interaktives Teilchenmodell im Gefäß mit Thermometer und Brenner"></canvas>
+
+  <button type="button" class="hud-fab" id="toggle-hud-btn" aria-expanded="true">Menü ausblenden</button>
+
+  <aside class="rail" id="rail" aria-label="Steuerung">
+    <div>
+      <span class="section-lbl">Stoff</span>
+      <div class="sub-grid" role="group" aria-label="Stoff wählen">
+        <button type="button" class="sub-btn active" data-sub="wasser">
+          <span>Wasser</span>
+          <svg width="20" height="16" viewBox="0 0 24 20" aria-hidden="true">
+            <circle cx="12" cy="11" r="6" fill="#ef4444" stroke="#7f1d1d" stroke-width="1.3"/>
+            <circle cx="6.5" cy="6.2" r="3.6" fill="#f8fafc" stroke="#334155" stroke-width="1.2"/>
+            <circle cx="17.5" cy="6.2" r="3.6" fill="#f8fafc" stroke="#334155" stroke-width="1.2"/>
+          </svg>
+        </button>
+        <button type="button" class="sub-btn" data-sub="ethanol">
+          <span>Ethanol</span>
+          <svg width="22" height="16" viewBox="0 0 26 20" aria-hidden="true">
+            <circle cx="9.5" cy="10" r="5.3" fill="#10b981" stroke="#064e3b" stroke-width="1.2"/>
+            <circle cx="17" cy="10" r="4.4" fill="#34d399" stroke="#064e3b" stroke-width="1.2"/>
+          </svg>
+        </button>
+        <button type="button" class="sub-btn" data-sub="argon">
+          <span>Argon</span>
+          <svg width="20" height="16" viewBox="0 0 22 20" aria-hidden="true">
+            <circle cx="11" cy="10" r="6" fill="#a78bfa" stroke="#4c1d95" stroke-width="1.3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div>
+      <span class="section-lbl">Zustand</span>
+      <div class="state-row" role="group" aria-label="Zustand wählen">
+        <button type="button" class="state-btn" data-state="fest">🧊 Fest</button>
+        <button type="button" class="state-btn active" data-state="fluessig">💧 Flüssig</button>
+        <button type="button" class="state-btn" data-state="gas">☁️ Gas</button>
+      </div>
+    </div>
+
+    <div class="temp-box">
+      <div class="temp-head">
+        <span>Temperatur</span>
+        <strong id="lbl-temp">20 °C</strong>
+      </div>
+      <input id="sl-temp" type="range" min="0" max="420" step="1" value="293" aria-label="Temperatur einstellen">
+      <div class="quick-row" id="quick-temps"></div>
+    </div>
+
+    <button type="button" class="toggle-chip" id="track-btn" aria-pressed="false">
+      <span>●</span><span>1 Teilchen verfolgen</span>
+    </button>
+
+    <div class="transport">
+      <button type="button" class="t-btn primary" id="play-btn" title="Pause / Weiter">⏸ Pause</button>
+      <button type="button" class="t-btn" id="step-btn" title="Einzelschritt" disabled>⏭</button>
+      <button type="button" class="t-btn" id="reset-btn" title="Zurücksetzen">↺</button>
+    </div>
+  </aside>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const N = 36;
+      const BOX_W = 12.0;
+      const BOX_H = 10.0;
+      const PARTICLE_R = 0.44;     // konstante Eigengröße der Teilchen
+      const R_CUT = 2.60;
+      const R_CUT2 = R_CUT * R_CUT;
+      const FIXED_DT = 0.002;      // <= 0.002s gemäß PHYSICS_CONTRACT
+      const HIT_RADIUS_PX = 44;    // >= 36px Finger-Hitbox
+      const TRACK_IDX = 14;
+      const MAX_TRACK = 150;
+      const MIN_K = 0;
+      const MAX_K = 420;           // 0 K (-273 °C) bis 420 K (+147 °C)
+      const HEAT_RATE_K_PER_S = 32;
+
+      const SUBSTANCES = {
+        wasser: {
+          name: "Wasser",
+          tmK: 273.15,  // 0 °C
+          tbK: 373.15,  // 100 °C
+          presetK: { fest: 253.15, fluessig: 293.15, gas: 393.15 },
+          quickC: [-20, 0, 4, 20, 115],
+          quickK: [0, 273, 277, 293, 388]
+        },
+        ethanol: {
+          name: "Ethanol",
+          tmK: 159.15,  // -114 °C
+          tbK: 351.15,  // 78 °C
+          presetK: { fest: 133.15, fluessig: 293.15, gas: 373.15 },
+          quickC: [-140, -40, 4, 20, 95],
+          quickK: [0, 159, 273, 293, 368]
+        },
+        argon: {
+          name: "Argon",
+          tmK: 83.8,    // -189 °C
+          tbK: 87.3,    // -186 °C
+          presetK: { fest: 45, fluessig: 85.5, gas: 293.15 },
+          quickC: [-230, -188, 20],
+          quickK: [0, 45, 85, 293]
+        }
+      };
+
+      const PRESETS = {
+        "sek1": { sub: "wasser", tempK: 293.15, unit: "C", track: false },
+        "kelvin": { sub: "wasser", tempK: 293.15, unit: "K", track: false },
+        "dichteanomalie": { sub: "wasser", tempK: 277.15, unit: "C", track: false },
+        "ethanol": { sub: "ethanol", tempK: 293.15, unit: "C", track: false },
+        "argon": { sub: "argon", tempK: 293.15, unit: "C", track: false }
+      };
+
+      const canvas = document.getElementById("sim-canvas");
+      const ctx = canvas.getContext("2d");
+
+      const rail = document.getElementById("rail");
+      const toggleHudBtn = document.getElementById("toggle-hud-btn");
+      const subButtons = Array.from(document.querySelectorAll(".sub-btn"));
+      const stateButtons = Array.from(document.querySelectorAll(".state-btn"));
+      const slTemp = document.getElementById("sl-temp");
+      const lblTemp = document.getElementById("lbl-temp");
+      const quickTempsEl = document.getElementById("quick-temps");
+      const trackBtn = document.getElementById("track-btn");
+      const playBtn = document.getElementById("play-btn");
+      const stepBtn = document.getElementById("step-btn");
+      const resetBtn = document.getElementById("reset-btn");
+
+      const x = new Float64Array(N);
+      const y = new Float64Array(N);
+      const vx = new Float64Array(N);
+      const vy = new Float64Array(N);
+      const ax = new Float64Array(N);
+      const ay = new Float64Array(N);
+      const angle = new Float64Array(N);
+      const angVel = new Float64Array(N);
+
+      const state = {
+        substance: "wasser",
+        tempK: 293.15,
+        unit: "C",
+        running: true,
+        showTrack: false,
+        trackHistory: [],
+        heaterVal: 0,
+        dragTarget: null,
+        activePointerId: null,
+        pointerBoxX: 0,
+        pointerBoxY: 0,
+        prevPointerBoxX: 0,
+        prevPointerBoxY: 0,
+        animPhase: 0,
+        initialSub: "wasser",
+        initialTempK: 293.15,
+        initialUnit: "C"
+      };
+
+      let viewW = 0;
+      let viewH = 0;
+      let dpr = 1;
+      let accTime = 0;
+      let lastFrameTime = performance.now();
+      let thermoHitRect = { x: 0, y: 0, w: 0, h: 0 };
+      let heaterHitRect = { x: 0, y: 0, w: 0, h: 0, trackTop: 0, trackBot: 0 };
+
+      function clamp(v, lo, hi) {
+        return Math.max(lo, Math.min(hi, v));
+      }
+
+      function smoothstep(edge0, edge1, val) {
+        const t = clamp((val - edge0) / (edge1 - edge0), 0, 1);
+        return t * t * (3 - 2 * t);
+      }
+
+      function formatTemp(tempK) {
+        if (state.unit === "K") return Math.round(tempK) + " K";
+        return Math.round(tempK - 273.15) + " °C";
+      }
+
+      function getPhase() {
+        const sub = SUBSTANCES[state.substance];
+        if (state.tempK <= sub.tmK) return "fest";
+        if (state.tempK < sub.tbK) return "fluessig";
+        return "gas";
+      }
+
+      // Stetige, glatte Abbildung der Temperatur auf reduzierte LJ-Temperatur T* (keine harten Sprünge!)
+      function getReducedTempStar() {
+        if (state.tempK <= 0.5) return 0; // Absoluter Nullpunkt: vollständige Ruhe
+        const sub = SUBSTANCES[state.substance];
+        const T = state.tempK;
+        const meltLow = sub.tmK - Math.min(2, (sub.tbK - sub.tmK) * 0.25);
+        const meltHigh = sub.tmK + Math.min(12, (sub.tbK - sub.tmK) * 0.45);
+
+        if (T <= meltLow) {
+          // Festkörper: sichtbares Zittern am Gitterplatz (<= 0.18, kein Wegkriechen)
+          return 0.18 * Math.pow(T / Math.max(1, meltLow), 0.75);
+        }
+        if (T < meltHigh) {
+          // Sanfter Schmelzübergang: 0.18 -> 0.43
+          return 0.18 + 0.25 * smoothstep(meltLow, meltHigh, T);
+        }
+        if (T < sub.tbK) {
+          // Flüssigbereich: 0.43 -> 0.66
+          const f = (T - meltHigh) / Math.max(0.5, sub.tbK - meltHigh);
+          return 0.43 + 0.23 * f;
+        }
+        // Sieden & Gasphase: 0.66 -> 1.85
+        const over = (T - sub.tbK) / 28;
+        return clamp(0.66 + 0.65 * over, 0.66, 1.85);
+      }
+
+      // Stetiger effektiver Paar-Abstand sigma(T):
+      // Bei Wasser minimiert sich der Abstand sanft bei 4 °C und weitet sich unter 0 °C um ~4,5 % (sichtbare Dichteanomalie ohne künstliches Gitter!)
+      function getEffectiveSigma() {
+        if (state.substance === "wasser") {
+          const tempC = state.tempK - 273.15;
+          const freezeExpand = 0.048 * (1 - smoothstep(-3, 2, tempC));
+          const warmExpand = 0.03 * smoothstep(4, 98, tempC);
+          return 0.99 + freezeExpand + warmExpand;
+        }
+        // Ethanol & Argon: ziehen sich beim Abkühlen monoton zusammen
+        const sub = SUBSTANCES[state.substance];
+        return 0.95 + 0.06 * clamp(state.tempK / sub.tbK, 0, 1);
+      }
+
+      function initParticles() {
+        const ph = getPhase();
+        const cols = 9;
+        for (let i = 0; i < N; i++) {
+          if (ph === "gas") {
+            x[i] = 1.4 + (i % 6) * 1.8;
+            y[i] = 1.2 + Math.floor(i / 6) * 1.45;
+          } else {
+            const r = Math.floor(i / cols);
+            const c = i % cols;
+            x[i] = 1.6 + (c + (r % 2) * 0.5) * 1.08;
+            y[i] = BOX_H - 0.82 - r * 0.95;
+          }
+          const a = (i * 2.39996) % (Math.PI * 2);
+          vx[i] = Math.cos(a) * 0.45;
+          vy[i] = Math.sin(a) * 0.45;
+          angle[i] = a;
+          angVel[i] = (i % 2 === 0 ? 1 : -1) * 0.8;
+        }
+        state.trackHistory = [];
+        computeForces();
+      }
+
+      // Reine kontinuierliche Lennard-Jones-Kräfte (kein abruptes Umschalten, kein Gitter-Zwang!)
+      function computeForces() {
+        const sigma = getEffectiveSigma();
+        const sig2 = sigma * sigma;
+        const rCut2 = R_CUT2 * sig2;
+
+        ax.fill(0);
+        ay.fill(0.32); // sanfte Schwerkraft hält fest/flüssig am Boden
+
+        for (let i = 0; i < N; i++) {
+          const xi = x[i];
+          const yi = y[i];
+          for (let j = i + 1; j < N; j++) {
+            const dx = x[j] - xi;
+            const dy = y[j] - yi;
+            const r2 = dx * dx + dy * dy;
+            if (r2 < rCut2) {
+              // Softening verhindert Singularität / Ecken-Explosion bei engem Kontakt
+              const effR2 = Math.max(r2, 0.78 * sig2);
+              const inv2 = sig2 / effR2;
+              const inv6 = inv2 * inv2 * inv2;
+              const fMag = clamp(24.0 * inv2 * inv6 * (2.0 * inv6 - 1.0), -90, 90);
+              const fx = -fMag * dx;
+              const fy = -fMag * dy;
+              ax[i] += fx;
+              ay[i] += fy;
+              ax[j] -= fx;
+              ay[j] -= fy;
+            }
+          }
+        }
+      }
+
+      // Velocity Verlet Integration mit sanftem Thermostat
+      function stepVerlet(dt) {
+        const pad = PARTICLE_R + 0.05;
+        const tStar = getReducedTempStar();
+        const rotScale = clamp(Math.sqrt(tStar), 0, 1.8);
+
+        for (let i = 0; i < N; i++) {
+          vx[i] += 0.5 * dt * ax[i];
+          vy[i] += 0.5 * dt * ay[i];
+          x[i] += dt * vx[i];
+          y[i] += dt * vy[i];
+
+          if (x[i] < pad) { x[i] = pad; vx[i] = Math.abs(vx[i]) * 0.92; }
+          else if (x[i] > BOX_W - pad) { x[i] = BOX_W - pad; vx[i] = -Math.abs(vx[i]) * 0.92; }
+
+          if (y[i] < pad) { y[i] = pad; vy[i] = Math.abs(vy[i]) * 0.92; }
+          else if (y[i] > BOX_H - pad) { y[i] = BOX_H - pad; vy[i] = -Math.abs(vy[i]) * 0.92; }
+
+          angle[i] += angVel[i] * dt * rotScale;
+        }
+
+        computeForces();
+
+        let ke = 0;
+        for (let i = 0; i < N; i++) {
+          vx[i] += 0.5 * dt * ax[i];
+          vy[i] += 0.5 * dt * ay[i];
+
+          if (state.dragTarget === "stir") {
+            const dx = x[i] - state.pointerBoxX;
+            const dy = y[i] - state.pointerBoxY;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 1.8 && dist > 1e-4) {
+              const push = (1.8 - dist) * 14.0;
+              vx[i] += (dx / dist) * push * dt + (state.pointerBoxX - state.prevPointerBoxX) * 0.35;
+              vy[i] += (dy / dist) * push * dt + (state.pointerBoxY - state.prevPointerBoxY) * 0.35;
+            }
+          }
+
+          vx[i] = clamp(vx[i], -7.0, 7.0);
+          vy[i] = clamp(vy[i], -7.0, 7.0);
+          ke += 0.5 * (vx[i] * vx[i] + vy[i] * vy[i]);
+        }
+
+        if (tStar <= 0.001 && state.dragTarget !== "stir") {
+          for (let i = 0; i < N; i++) {
+            vx[i] *= 0.90;
+            vy[i] *= 0.90;
+          }
+          return;
+        }
+
+        const instT = Math.max(ke / N, 1e-4);
+        const factor = Math.sqrt(clamp(1 + 0.045 * (tStar / instT - 1), 0.72, 1.32));
+        for (let i = 0; i < N; i++) {
+          vx[i] *= factor;
+          vy[i] *= factor;
+        }
+      }
+
+      function getLayout() {
+        const railVisible = !rail.classList.contains("collapsed");
+        const stacked = viewW <= 720;
+        const rightMargin = (!stacked && railVisible) ? 276 : 18;
+        const bottomMargin = (stacked && railVisible) ? 315 : 22;
+        const topPad = 56;
+        const heaterSpace = 96;
+        const availW = Math.max(240, viewW - rightMargin - 20);
+        const availH = Math.max(200, viewH - topPad - bottomMargin - heaterSpace);
+
+        const pxPerUnit = clamp(Math.min(availW / BOX_W, availH / BOX_H), 16, 48);
+        const boxW = BOX_W * pxPerUnit;
+        const boxH = BOX_H * pxPerUnit;
+        const boxX = Math.max(18, (viewW - rightMargin + 16 - boxW) * 0.5);
+        const boxY = topPad + Math.max(16, (availH - boxH) * 0.52);
+
+        return { boxX, boxY, boxW, boxH, pxPerUnit };
+      }
+
+      function drawWaterMolecule(sx, sy, rPx, rot) {
+        const oR = rPx * 0.72;
+        const hR = rPx * 0.42;
+        const dist = rPx * 0.76;
+        const halfA = (104.5 * Math.PI) / 360;
+
+        ctx.fillStyle = "#ef4444";
+        ctx.strokeStyle = "#7f1d1d";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, oR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 1.1;
+        for (const a of [rot - halfA, rot + halfA]) {
+          ctx.beginPath();
+          ctx.arc(sx + Math.cos(a) * dist, sy + Math.sin(a) * dist, hR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      function drawEthanolMolecule(sx, sy, rPx, rot) {
+        const offset = rPx * 0.36;
+        const c1x = sx - Math.cos(rot) * offset;
+        const c1y = sy - Math.sin(rot) * offset;
+        const c2x = sx + Math.cos(rot) * offset;
+        const c2y = sy + Math.sin(rot) * offset;
+
+        ctx.fillStyle = "#10b981";
+        ctx.strokeStyle = "#064e3b";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(c1x, c1y, rPx * 0.68, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#34d399";
+        ctx.beginPath();
+        ctx.arc(c2x, c2y, rPx * 0.56, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function drawArgonAtom(sx, sy, rPx) {
+        const grad = ctx.createRadialGradient(sx - rPx * 0.3, sy - rPx * 0.3, rPx * 0.12, sx, sy, rPx);
+        grad.addColorStop(0, "#ddd6fe");
+        grad.addColorStop(0.6, "#8b5cf6");
+        grad.addColorStop(1, "#4c1d95");
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = "#3b0764";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, rPx * 0.92, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function drawThermometer(layout) {
+        const thX = layout.boxX + 34;
+        const thTop = layout.boxY - 40;
+        const stemH = 74;
+
+        ctx.save();
+        const badgeW = 86;
+        const badgeH = 26;
+        const badgeX = thX + 16;
+        const badgeY = thTop - 4;
+        thermoHitRect = { x: badgeX - 6, y: badgeY - 6, w: badgeW + 12, h: badgeH + 12 };
+
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "rgba(15, 23, 42, 0.22)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "700 12px ui-monospace, SFMono-Regular, monospace";
+        ctx.fillText(formatTemp(state.tempK), badgeX + 9, badgeY + 17);
+        ctx.fillStyle = "#0284c7";
+        ctx.font = "700 10px -apple-system, sans-serif";
+        ctx.fillText("▾", badgeX + badgeW - 14, badgeY + 16);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#475569";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.roundRect(thX - 5, thTop, 10, stemH, 5);
+        ctx.fill();
+        ctx.stroke();
+
+        const frac = clamp((state.tempK - MIN_K) / (MAX_K - MIN_K), 0.03, 0.96);
+        const colH = frac * (stemH - 8);
+        ctx.fillStyle = state.tempK < 273.15 ? "#0284c7" : "#ef4444";
+        ctx.fillRect(thX - 2.5, thTop + stemH - 4 - colH, 5, colH);
+
+        ctx.beginPath();
+        ctx.arc(thX, thTop + stemH + 4, 8.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = "#64748b";
+        ctx.lineWidth = 1;
+        for (let t = 12; t < stemH - 10; t += 10) {
+          ctx.beginPath();
+          ctx.moveTo(thX - 4, thTop + t);
+          ctx.lineTo(thX + 1, thTop + t);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawHeaterBucket(layout) {
+        const cx = layout.boxX + layout.boxW * 0.5;
+        const topY = layout.boxY + layout.boxH + 20;
+        const bucketW = 92;
+        const bucketH = 66;
+        const bx = cx - bucketW * 0.5;
+
+        ctx.save();
+        if (state.heaterVal > 0.08) {
+          const intensity = state.heaterVal;
+          const flicker = Math.sin(state.animPhase * 15) * 3 * intensity;
+          const fh = 22 * intensity;
+          ctx.fillStyle = "rgba(249, 115, 22, 0.88)";
+          ctx.beginPath();
+          ctx.moveTo(cx - 16, topY + 2);
+          ctx.quadraticCurveTo(cx, topY - fh + flicker, cx + 16, topY + 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(56, 189, 248, 0.85)";
+          ctx.beginPath();
+          ctx.moveTo(cx - 8, topY + 2);
+          ctx.quadraticCurveTo(cx, topY - fh * 0.65 + flicker * 0.5, cx + 8, topY + 2);
+          ctx.fill();
+        } else if (state.heaterVal < -0.08) {
+          const intensity = -state.heaterVal;
+          ctx.fillStyle = `rgba(186, 230, 253, ${0.5 + 0.45 * intensity})`;
+          ctx.strokeStyle = "#0284c7";
+          ctx.lineWidth = 1.3;
+          for (const dx of [-16, -2, 12]) {
+            ctx.beginPath();
+            ctx.roundRect(cx + dx - 5, topY - 12 * intensity, 11, 11, 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+
+        const grad = ctx.createLinearGradient(bx, 0, bx + bucketW, 0);
+        grad.addColorStop(0, "#cbd5e1");
+        grad.addColorStop(0.45, "#f1f5f9");
+        grad.addColorStop(1, "#94a3b8");
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = "#475569";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(bx, topY);
+        ctx.lineTo(bx + bucketW, topY);
+        ctx.lineTo(bx + bucketW - 10, topY + bucketH);
+        ctx.lineTo(bx + 10, topY + bucketH);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        const trackX = cx;
+        const trackTop = topY + 12;
+        const trackBot = topY + bucketH - 12;
+        const trackMid = (trackTop + trackBot) * 0.5;
+
+        ctx.fillStyle = "#ef4444";
+        ctx.fillRect(trackX - 3, trackTop, 6, trackMid - trackTop);
+        ctx.fillStyle = "#3b82f6";
+        ctx.fillRect(trackX - 3, trackMid, 6, trackBot - trackMid);
+
+        ctx.fillStyle = "#334155";
+        ctx.font = "700 10px -apple-system, sans-serif";
+        ctx.fillText("🔥", bx + 10, trackTop + 6);
+        ctx.fillText("❄️", bx + 10, trackBot + 2);
+
+        const knobY = trackMid - state.heaterVal * (trackMid - trackTop);
+        ctx.fillStyle = "#e0f2fe";
+        ctx.strokeStyle = "#0284c7";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(trackX - 18, knobY - 9, 36, 18, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(trackX - 10, knobY);
+        ctx.lineTo(trackX + 10, knobY);
+        ctx.stroke();
+
+        heaterHitRect = {
+          x: bx - 10,
+          y: topY - 12,
+          w: bucketW + 20,
+          h: bucketH + 24,
+          trackTop,
+          trackBot
+        };
+        ctx.restore();
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, viewW, viewH);
+        const layout = getLayout();
+
+        const benchY = layout.boxY + layout.boxH + 46;
+        ctx.save();
+        ctx.fillStyle = "rgba(203, 213, 225, 0.55)";
+        ctx.fillRect(0, benchY, viewW, viewH - benchY);
+        ctx.strokeStyle = "rgba(100, 116, 139, 0.35)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, benchY);
+        ctx.lineTo(viewW, benchY);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.roundRect(layout.boxX, layout.boxY, layout.boxW, layout.boxH, 12);
+        ctx.fill();
+
+        const scaleX = layout.boxX + layout.boxW - 14;
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
+        ctx.lineWidth = 1.2;
+        for (let k = 1; k <= 5; k++) {
+          const sy = layout.boxY + layout.boxH - (k * layout.boxH) / 6;
+          ctx.beginPath();
+          ctx.moveTo(scaleX, sy);
+          ctx.lineTo(scaleX + 8, sy);
+          ctx.stroke();
+        }
+
+        const toScreen = (bx, by) => ({
+          sx: layout.boxX + bx * layout.pxPerUnit,
+          sy: layout.boxY + by * layout.pxPerUnit
+        });
+
+        if (state.showTrack && state.trackHistory.length > 1) {
+          ctx.strokeStyle = "#fbbf24";
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          for (let i = 0; i < state.trackHistory.length; i++) {
+            const p = toScreen(state.trackHistory[i].x, state.trackHistory[i].y);
+            if (i === 0) ctx.moveTo(p.sx, p.sy);
+            else ctx.lineTo(p.sx, p.sy);
+          }
+          ctx.stroke();
+        }
+
+        const rPx = PARTICLE_R * layout.pxPerUnit;
+        for (let i = 0; i < N; i++) {
+          const { sx, sy } = toScreen(x[i], y[i]);
+          if (state.showTrack && i === TRACK_IDX) {
+            ctx.fillStyle = "rgba(251, 191, 36, 0.36)";
+            ctx.beginPath();
+            ctx.arc(sx, sy, rPx * 1.48, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          if (state.substance === "wasser") {
+            drawWaterMolecule(sx, sy, rPx, angle[i]);
+          } else if (state.substance === "ethanol") {
+            drawEthanolMolecule(sx, sy, rPx, angle[i]);
+          } else {
+            drawArgonAtom(sx, sy, rPx);
+          }
+        }
+
+        if (state.dragTarget === "stir") {
+          const p = toScreen(state.pointerBoxX, state.pointerBoxY);
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.65)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(p.sx, p.sy, Math.max(HIT_RADIUS_PX * 0.55, layout.pxPerUnit * 1.1), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        const glassGrad = ctx.createLinearGradient(layout.boxX, 0, layout.boxX + layout.boxW, 0);
+        glassGrad.addColorStop(0, "rgba(255, 255, 255, 0.14)");
+        glassGrad.addColorStop(0.08, "rgba(255, 255, 255, 0.02)");
+        glassGrad.addColorStop(0.92, "rgba(255, 255, 255, 0.02)");
+        glassGrad.addColorStop(1, "rgba(255, 255, 255, 0.10)");
+        ctx.fillStyle = glassGrad;
+        ctx.beginPath();
+        ctx.roundRect(layout.boxX, layout.boxY, layout.boxW, layout.boxH, 12);
+        ctx.fill();
+
+        ctx.strokeStyle = "#64748b";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.roundRect(layout.boxX, layout.boxY, layout.boxW, layout.boxH, 12);
+        ctx.stroke();
+
+        ctx.fillStyle = "#94a3b8";
+        ctx.strokeStyle = "#475569";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(layout.boxX + 18, layout.boxY - 9, layout.boxW - 36, 11, 4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        drawThermometer(layout);
+        drawHeaterBucket(layout);
+
+        lblTemp.textContent = formatTemp(state.tempK);
+        const ph = getPhase();
+        for (const btn of stateButtons) {
+          btn.classList.toggle("active", btn.dataset.state === ph);
+        }
+      }
+
+      function renderQuickButtons() {
+        const sub = SUBSTANCES[state.substance];
+        quickTempsEl.innerHTML = "";
+        const list = state.unit === "K" ? sub.quickK : sub.quickC;
+        for (const val of list) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "quick-btn";
+          b.textContent = state.unit === "K" ? val + " K" : val + " °C";
+          b.addEventListener("click", function () {
+            state.tempK = state.unit === "K" ? val : val + 273.15;
+            slTemp.value = String(Math.round(state.tempK));
+          });
+          quickTempsEl.appendChild(b);
+        }
+      }
+
+      function selectSubstance(subKey) {
+        if (!SUBSTANCES[subKey]) return;
+        state.substance = subKey;
+        for (const btn of subButtons) {
+          btn.classList.toggle("active", btn.dataset.sub === subKey);
+        }
+        renderQuickButtons();
+      }
+
+      function applyQueryParams() {
+        const params = new URLSearchParams(window.location.search);
+        const pName = params.get("preset");
+        if (pName && PRESETS[pName]) {
+          const p = PRESETS[pName];
+          state.substance = p.sub;
+          state.tempK = p.tempK;
+          state.unit = p.unit;
+          state.showTrack = p.track;
+          state.initialSub = p.sub;
+          state.initialTempK = p.tempK;
+          state.initialUnit = p.unit;
+        }
+        if (params.has("sub") && SUBSTANCES[params.get("sub")]) {
+          state.substance = params.get("sub");
+          state.initialSub = state.substance;
+        }
+        if (params.has("unit")) {
+          state.unit = params.get("unit").toUpperCase() === "K" ? "K" : "C";
+          state.initialUnit = state.unit;
+        }
+        if (params.has("tempC")) {
+          const c = Number(params.get("tempC"));
+          if (Number.isFinite(c)) {
+            state.tempK = clamp(c + 273.15, MIN_K, MAX_K);
+            state.initialTempK = state.tempK;
+          }
+        }
+        if (params.has("tempK")) {
+          const k = Number(params.get("tempK"));
+          if (Number.isFinite(k)) {
+            state.tempK = clamp(k, MIN_K, MAX_K);
+            state.initialTempK = state.tempK;
+          }
+        }
+        if (params.has("track")) state.showTrack = params.get("track") !== "0";
+      }
+
+      function syncUIFromState() {
+        slTemp.value = String(Math.round(state.tempK));
+        for (const btn of subButtons) {
+          btn.classList.toggle("active", btn.dataset.sub === state.substance);
+        }
+        trackBtn.classList.toggle("active", state.showTrack);
+        trackBtn.setAttribute("aria-pressed", String(state.showTrack));
+        playBtn.textContent = state.running ? "⏸ Pause" : "▶ Weiter";
+        stepBtn.disabled = state.running;
+        renderQuickButtons();
+      }
+
+      function pointerCoords(ev) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+      }
+
+      function updateHeaterFromY(sy) {
+        const mid = (heaterHitRect.trackTop + heaterHitRect.trackBot) * 0.5;
+        const half = Math.max(10, (heaterHitRect.trackBot - heaterHitRect.trackTop) * 0.5);
+        state.heaterVal = clamp((mid - sy) / half, -1, 1);
+      }
+
+      canvas.addEventListener("pointerdown", function (ev) {
+        if (state.activePointerId !== null) return;
+        const { x: sx, y: sy } = pointerCoords(ev);
+
+        if (
+          sx >= thermoHitRect.x && sx <= thermoHitRect.x + thermoHitRect.w &&
+          sy >= thermoHitRect.y && sy <= thermoHitRect.y + thermoHitRect.h
+        ) {
+          state.unit = state.unit === "C" ? "K" : "C";
+          renderQuickButtons();
+          return;
+        }
+
+        if (
+          sx >= heaterHitRect.x && sx <= heaterHitRect.x + heaterHitRect.w &&
+          sy >= heaterHitRect.y && sy <= heaterHitRect.y + heaterHitRect.h
+        ) {
+          state.dragTarget = "heater";
+          state.activePointerId = ev.pointerId;
+          canvas.classList.add("dragging");
+          canvas.setPointerCapture(ev.pointerId);
+          updateHeaterFromY(sy);
+          return;
+        }
+
+        const layout = getLayout();
+        const pad = HIT_RADIUS_PX * 0.5;
+        if (
+          sx >= layout.boxX - pad && sx <= layout.boxX + layout.boxW + pad &&
+          sy >= layout.boxY - pad && sy <= layout.boxY + layout.boxH + pad
+        ) {
+          state.dragTarget = "stir";
+          state.activePointerId = ev.pointerId;
+          state.pointerBoxX = clamp((sx - layout.boxX) / layout.pxPerUnit, 0, BOX_W);
+          state.pointerBoxY = clamp((sy - layout.boxY) / layout.pxPerUnit, 0, BOX_H);
+          state.prevPointerBoxX = state.pointerBoxX;
+          state.prevPointerBoxY = state.pointerBoxY;
+          canvas.classList.add("dragging");
+          canvas.setPointerCapture(ev.pointerId);
+        }
+      });
+
+      canvas.addEventListener("pointermove", function (ev) {
+        if (ev.pointerId !== state.activePointerId) return;
+        const { x: sx, y: sy } = pointerCoords(ev);
+        if (state.dragTarget === "heater") {
+          updateHeaterFromY(sy);
+        } else if (state.dragTarget === "stir") {
+          const layout = getLayout();
+          state.prevPointerBoxX = state.pointerBoxX;
+          state.prevPointerBoxY = state.pointerBoxY;
+          state.pointerBoxX = clamp((sx - layout.boxX) / layout.pxPerUnit, 0, BOX_W);
+          state.pointerBoxY = clamp((sy - layout.boxY) / layout.pxPerUnit, 0, BOX_H);
+        }
+      });
+
+      function endPointer(ev) {
+        if (ev.pointerId !== state.activePointerId) return;
+        if (state.dragTarget === "heater") {
+          state.heaterVal = 0;
+        }
+        state.dragTarget = null;
+        state.activePointerId = null;
+        canvas.classList.remove("dragging");
+        if (canvas.hasPointerCapture(ev.pointerId)) {
+          canvas.releasePointerCapture(ev.pointerId);
+        }
+      }
+
+      canvas.addEventListener("pointerup", endPointer);
+      canvas.addEventListener("pointercancel", endPointer);
+
+      for (const btn of subButtons) {
+        btn.addEventListener("click", function () {
+          selectSubstance(btn.dataset.sub);
+        });
+      }
+
+      for (const btn of stateButtons) {
+        btn.addEventListener("click", function () {
+          const sub = SUBSTANCES[state.substance];
+          state.tempK = sub.presetK[btn.dataset.state];
+          slTemp.value = String(Math.round(state.tempK));
+        });
+      }
+
+      slTemp.addEventListener("input", function () {
+        state.tempK = parseFloat(slTemp.value);
+      });
+
+      trackBtn.addEventListener("click", function () {
+        state.showTrack = !state.showTrack;
+        state.trackHistory = [];
+        trackBtn.classList.toggle("active", state.showTrack);
+        trackBtn.setAttribute("aria-pressed", String(state.showTrack));
+      });
+
+      playBtn.addEventListener("click", function () {
+        state.running = !state.running;
+        playBtn.textContent = state.running ? "⏸ Pause" : "▶ Weiter";
+        stepBtn.disabled = state.running;
+      });
+
+      stepBtn.addEventListener("click", function () {
+        if (state.running) return;
+        for (let s = 0; s < 10; s++) {
+          stepVerlet(FIXED_DT);
+        }
+        if (state.showTrack) {
+          state.trackHistory.push({ x: x[TRACK_IDX], y: y[TRACK_IDX] });
+          if (state.trackHistory.length > MAX_TRACK) state.trackHistory.shift();
+        }
+      });
+
+      resetBtn.addEventListener("click", function () {
+        state.substance = state.initialSub;
+        state.tempK = state.initialTempK;
+        state.unit = state.initialUnit;
+        state.heaterVal = 0;
+        syncUIFromState();
+        initParticles();
+      });
+
+      toggleHudBtn.addEventListener("click", function () {
+        const collapsed = rail.classList.toggle("collapsed");
+        toggleHudBtn.textContent = collapsed ? "Menü einblenden" : "Menü ausblenden";
+        toggleHudBtn.setAttribute("aria-expanded", String(!collapsed));
+      });
+
+      function updateCanvasSize() {
+        const rect = canvas.getBoundingClientRect();
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        viewW = rect.width;
+        viewH = rect.height;
+        canvas.width = Math.round(viewW * dpr);
+        canvas.height = Math.round(viewH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      const ro = new ResizeObserver(updateCanvasSize);
+      ro.observe(canvas);
+
+      function tick(now) {
+        const frameDt = Math.min((now - lastFrameTime) / 1000, 0.05);
+        lastFrameTime = now;
+        state.animPhase += frameDt;
+
+        if (Math.abs(state.heaterVal) > 0.05) {
+          state.tempK = clamp(
+            state.tempK + state.heaterVal * HEAT_RATE_K_PER_S * frameDt,
+            MIN_K,
+            MAX_K
+          );
+          slTemp.value = String(Math.round(state.tempK));
+        }
+
+        if (state.running) {
+          accTime += frameDt * 2.4;
+          while (accTime >= FIXED_DT) {
+            stepVerlet(FIXED_DT);
+            accTime -= FIXED_DT;
+          }
+          if (state.showTrack) {
+            state.trackHistory.push({ x: x[TRACK_IDX], y: y[TRACK_IDX] });
+            if (state.trackHistory.length > MAX_TRACK) state.trackHistory.shift();
+          }
+        } else {
+          accTime = 0;
+        }
+
+        render();
+        requestAnimationFrame(tick);
+      }
+
+      applyQueryParams();
+      syncUIFromState();
+      updateCanvasSize();
+      initParticles();
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>

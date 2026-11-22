@@ -1,6 +1,6 @@
 # PHYSICS_CONTRACT.md — Verbindliche Spezifikation für `physik-sims`
 
-Jede Simulation in `sims/` ist ein eigenständiges, taktiles Physik- oder Mathematik-Werkzeug („Fidget-Toy“ und Unterrichtslabor). Alle Simulationen **müssen** diese Spezifikation einhalten. `build.py --check` prüft zentrale Teile davon automatisiert vor jedem Deploy.
+Jede Simulation in `sims/` ist ein eigenständiges, taktiles Physik- oder Mathematik-Werkzeug („Fidget-Toy“ und Unterrichtslabor). Alle Simulationen **müssen** diese technische Spezifikation sowie die didaktischen Kriterien in [`DIDAKTIK_SIMS.md`](DIDAKTIK_SIMS.md) einhalten. `build.py --check` prüft zentrale Teile davon automatisiert vor jedem Deploy.
 
 ---
 
@@ -76,12 +76,14 @@ Jede Simulationsdatei **muss** ganz oben (direkt vor oder nach `<!DOCTYPE html>`
 1. **Sofort interaktiv („Fidget-First“):**
    * Keine Startbildschirme oder Modals. Die Simulation läuft oder reagiert ab dem ersten Pixel-Kontakt.
    * Direktes Greifen/Ziehen im Canvas hat Vorrang vor Menüs.
-2. **Ruhiges Labor-Design:**
-   * Inspiriert von 3Blue1Brown / Desmos (standardmäßig klares Dark-Lab- oder Light-Lab-Theme mit hohem Kontrast für Beamer & iPad).
+2. **Anschauliches Labor-Design (Sek I & Sek II):**
+   * **Sek I / Phänomen-Orientierung:** Freundliches, helles **Light-Lab-Design** im Stil von PhET mit erkennbaren Laborgeräten (Becherglas, Thermometer, Bunsenbrenner, Waage, Federkraftmesser) und klarer Verbindung zwischen **Beobachtung (Makro)** und **Modell (Mikro)**.
+   * **Sek II / Abstrakte Systeme:** Ruhiges Light- oder Dark-Lab-Design mit hohem Kontrast für Beamer & iPad.
    * Full-Viewport-Canvas + kompaktes, einklappbares HUD (für reinen Fidget-/Beamer-Modus ausblendbar).
-   * **Maximal 3–4 klare Slider** + `Play/Pause` + `Reset` (ggf. `Spur löschen`).
-3. **Mindestens eine umschaltbare Repräsentationsebene:**
-   * Jede Simulation bietet mindestens eine ein-/ausblendbare analytische Ebene (z. B. Kraft-/Geschwindigkeitsvektoren, Live-Energiebalken, Phasenraum, Feldlinien, Funktionsgraph).
+   * **Maximal 3–4 klare Steuer-Elemente** + `Play/Pause` + `Reset` (ggf. `Spur löschen`).
+3. **Sinnvolle, rauscharme Repräsentationsebenen:**
+   * Jede Simulation bietet mindestens eine ein-/ausblendbare analytische Ebene (z. B. Spur eines einzelnen Teilchens, Kraftvektoren, Live-Energiebalken, Phasenraum, Hohlraum-/Volumenvergleich).
+   * **Kein visuelles Rauschen & keine Scheinkurven:** Keine Dutzenden gleichzeitig aufploppenden Vektorpfeile (lieber ein verfolgtes Einzelobjekt) und keine Diagramme, die nur eine hart geskriptete Slider-/Button-Rate abzeichnen statt echter physikalischer Dynamik.
 4. **URL-Presets für Arbeitsblätter:**
    * Simulationen lesen optionale Query-Parameter (`?preset=...` sowie zentrale Parameter wie `?L=1.5&g=1.62&gamma=0.15`), sodass QR-Codes auf Arbeitsblättern direkt ein passendes Experiment-Szenario starten können.
 5. **Arbeitsblatt-Kompatibilität (`Schule`-Pipeline):**

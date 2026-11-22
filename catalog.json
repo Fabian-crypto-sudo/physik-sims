@@ -1,7 +1,7 @@
 {
   "base_url": "https://fabian-crypto-sudo.github.io/physik-sims/",
-  "generated_at": "2026-11-22T21:32:17+00:00",
-  "count": 1,
+  "generated_at": "2026-11-22T22:35:39+00:00",
+  "count": 2,
   "simulations": [
     {
       "id": "fadenpendel",
@@ -48,6 +48,58 @@
       ],
       "path": "sims/physik/fadenpendel.html",
       "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/fadenpendel.html"
+    },
+    {
+      "id": "teilchenmodell-aggregatzustaende",
+      "title": "Teilchenmodell & Aggregatzustände",
+      "subject": "physik",
+      "topic": "Wärmelehre & Teilchenmodell",
+      "grade": "Sek I",
+      "tags": [
+        "Teilchenmodell",
+        "Aggregatzustände",
+        "Dichteanomalie",
+        "Kelvin",
+        "Absoluter Nullpunkt",
+        "Atom",
+        "Molekül"
+      ],
+      "summary": "Taktile Single-Stage-Simulation (kontinuierliche Velocity-Verlet-Molekulardynamik) im PhET-inspirierten Labor-Design: Gefäß mit Thermometer (°C/K bis 0 K), direktem Brenner/Eisbad-Regler, Wasser (H₂O), Ethanol und Argon (Einzelatom).",
+      "controls": [
+        "Teilchen im Gefäß direkt antippen oder umrühren",
+        "Brenner/Eisbad-Hebel unter dem Gefäß hoch-/runterziehen",
+        "Thermometer antippen (°C ↔ K)",
+        "Rechts: Stoff (Wasser, Ethanol, Argon), Zustand (Fest/Flüssig/Gas), Temperatur-Slider, 1 Teilchen verfolgen, Einzelschritt"
+      ],
+      "representations": [
+        "Kontinuierliches Teilchenmodell im geschlossenen Gefäß",
+        "Thermometer (°C/K)",
+        "Teilchenspur (1 verfolgtes Teilchen)"
+      ],
+      "presets": [
+        {
+          "name": "sek1",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/teilchenmodell-aggregatzustaende.html?preset=sek1"
+        },
+        {
+          "name": "kelvin",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/teilchenmodell-aggregatzustaende.html?preset=kelvin"
+        },
+        {
+          "name": "dichteanomalie",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/teilchenmodell-aggregatzustaende.html?preset=dichteanomalie"
+        },
+        {
+          "name": "ethanol",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/teilchenmodell-aggregatzustaende.html?preset=ethanol"
+        },
+        {
+          "name": "argon",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/teilchenmodell-aggregatzustaende.html?preset=argon"
+        }
+      ],
+      "path": "sims/physik/teilchenmodell-aggregatzustaende.html",
+      "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/teilchenmodell-aggregatzustaende.html"
     }
   ]
 }

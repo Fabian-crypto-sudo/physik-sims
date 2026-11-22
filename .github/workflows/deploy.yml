@@ -32,7 +32,7 @@ jobs:
       - name: Prepare Pages artifact
         run: |
           mkdir -p _site
-          cp index.html catalog.json PHYSICS_CONTRACT.md README.md _site/
+          cp index.html catalog.json DIDAKTIK_SIMS.md PHYSICS_CONTRACT.md README.md _site/
           cp -r sims _site/sims
 
       - name: Setup Pages
