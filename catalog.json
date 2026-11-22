@@ -1,0 +1,53 @@
+{
+  "base_url": "https://fabian-crypto-sudo.github.io/physik-sims/",
+  "generated_at": "2026-11-22T21:32:17+00:00",
+  "count": 1,
+  "simulations": [
+    {
+      "id": "fadenpendel",
+      "title": "Gedämpftes Fadenpendel",
+      "subject": "physik",
+      "topic": "Mechanik & Schwingungen",
+      "grade": "Sek I / Sek II",
+      "tags": [
+        "Pendel",
+        "Schwingung",
+        "Energieerhaltung",
+        "Dämpfung",
+        "Phasenraum",
+        "RK4"
+      ],
+      "summary": "Taktiles mathematisches/gedämpftes Fadenpendel mit RK4-Integration, direktem Anfassen & Anschubsen sowie umschaltbaren Ebenen für Vektoren, Live-Energiebilanz und Phasenraum.",
+      "controls": [
+        "Pendelmasse direkt greifen, auslenken oder anschubsen",
+        "Slider: Seillänge L, Fallbeschleunigung g, Dämpfung γ",
+        "Ebenen: Kraft- & Geschwindigkeitsvektoren, Energiebalken, Phasenraum (φ, ω)"
+      ],
+      "representations": [
+        "Kraft- & Geschwindigkeitsvektoren",
+        "Live-Energiebalken",
+        "Phasenraum (φ, ω)"
+      ],
+      "presets": [
+        {
+          "name": "ungedaempft",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/fadenpendel.html?preset=ungedaempft"
+        },
+        {
+          "name": "stark-gedaempft",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/fadenpendel.html?preset=stark-gedaempft"
+        },
+        {
+          "name": "mond",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/fadenpendel.html?preset=mond"
+        },
+        {
+          "name": "jupiter",
+          "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/fadenpendel.html?preset=jupiter"
+        }
+      ],
+      "path": "sims/physik/fadenpendel.html",
+      "url": "https://fabian-crypto-sudo.github.io/physik-sims/sims/physik/fadenpendel.html"
+    }
+  ]
+}

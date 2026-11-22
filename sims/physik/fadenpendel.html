@@ -1,0 +1,984 @@
+<!--
+@id: fadenpendel
+@title: Gedämpftes Fadenpendel
+@subject: physik
+@topic: Mechanik & Schwingungen
+@grade: Sek I / Sek II
+@tags: Pendel, Schwingung, Energieerhaltung, Dämpfung, Phasenraum, RK4
+@summary: Taktiles mathematisches/gedämpftes Fadenpendel mit RK4-Integration, direktem Anfassen & Anschubsen sowie umschaltbaren Ebenen für Vektoren, Live-Energiebilanz und Phasenraum.
+@controls: Pendelmasse direkt greifen, auslenken oder anschubsen | Slider: Seillänge L, Fallbeschleunigung g, Dämpfung γ | Ebenen: Kraft- & Geschwindigkeitsvektoren, Energiebalken, Phasenraum (φ, ω)
+@representations: Kraft- & Geschwindigkeitsvektoren, Live-Energiebalken, Phasenraum (φ, ω)
+@presets: ungedaempft, stark-gedaempft, mond, jupiter
+-->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Gedämpftes Fadenpendel — physik-sims</title>
+  <style>
+    :root {
+      --bg: #080d1a;
+      --bg-grad: #111b33;
+      --panel: rgba(15, 23, 42, 0.82);
+      --panel-border: rgba(148, 163, 184, 0.22);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --cyan: #38bdf8;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --emerald: #34d399;
+      --violet: #a78bfa;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 25%, var(--bg-grad) 0%, var(--bg) 72%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    #sim-canvas {
+      display: block;
+      width: 100%;
+      height: 100dvh;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      cursor: grab;
+    }
+
+    #sim-canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .topbar {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .title-chip {
+      pointer-events: auto;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .title-chip h1 {
+      margin: 0;
+      font-size: 0.96rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .readout {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .readout span b {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .top-actions {
+      pointer-events: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .icon-btn {
+      min-height: 38px;
+      padding: 0 12px;
+      border-radius: 10px;
+      border: 1px solid var(--panel-border);
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--text);
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--cyan);
+    }
+
+    .hud {
+      position: fixed;
+      left: 50%;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      width: min(820px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .hud.collapsed {
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 16px);
+    }
+
+    .sliders {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px 14px;
+    }
+
+    @media (max-width: 680px) {
+      .sliders {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+      .title-chip {
+        max-width: 62vw;
+      }
+    }
+
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .slider-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .slider-head strong {
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 36px;
+      margin: 0;
+      accent-color: var(--cyan);
+      background: transparent;
+      cursor: pointer;
+      touch-action: pan-x;
+    }
+
+    .hud-bottom {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .btn-row, .layer-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .btn {
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 9px;
+      border: 1px solid var(--panel-border);
+      background: rgba(30, 41, 59, 0.85);
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .btn-primary {
+      background: var(--cyan);
+      color: #082f49;
+      border-color: transparent;
+    }
+
+    .chip {
+      min-height: 36px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid var(--panel-border);
+      background: rgba(30, 41, 59, 0.55);
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .chip.active {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: var(--cyan);
+      color: var(--text);
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="sim-canvas" aria-label="Interaktive Simulation eines gedämpften Fadenpendels"></canvas>
+
+  <div class="topbar">
+    <div class="title-chip">
+      <h1>Gedämpftes Fadenpendel</h1>
+      <div class="readout" id="readout">
+        <span>φ = <b id="val-phi">0.0°</b></span>
+        <span>ω = <b id="val-omega">0.00 rad/s</b></span>
+        <span>T₀ = <b id="val-period">2.20 s</b></span>
+        <span id="preset-badge" hidden>Preset: <b id="val-preset"></b></span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="icon-btn" id="toggle-hud-btn" aria-expanded="true">HUD ausblenden</button>
+    </div>
+  </div>
+
+  <section class="hud" id="hud" aria-label="Steuerung">
+    <div class="sliders">
+      <label class="slider-group">
+        <span class="slider-head"><span>Seillänge L</span><strong id="lbl-L">1.20 m</strong></span>
+        <input id="sl-L" type="range" min="0.40" max="2.50" step="0.05" value="1.20">
+      </label>
+      <label class="slider-group">
+        <span class="slider-head"><span>Gravitation g</span><strong id="lbl-g">9.81 m/s²</strong></span>
+        <input id="sl-g" type="range" min="1.62" max="24.79" step="0.01" value="9.81">
+      </label>
+      <label class="slider-group">
+        <span class="slider-head"><span>Dämpfung γ</span><strong id="lbl-gamma">0.08 s⁻¹</strong></span>
+        <input id="sl-gamma" type="range" min="0.00" max="1.20" step="0.02" value="0.08">
+      </label>
+    </div>
+
+    <div class="hud-bottom">
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" id="play-btn">Pause</button>
+        <button type="button" class="btn" id="reset-btn">Zurücksetzen</button>
+        <button type="button" class="btn" id="clear-btn">Spur leeren</button>
+      </div>
+      <div class="layer-row" role="group" aria-label="Repräsentationsebenen">
+        <button type="button" class="chip active" id="layer-vectors" aria-pressed="true">Vektoren</button>
+        <button type="button" class="chip active" id="layer-energy" aria-pressed="true">Energiebalken</button>
+        <button type="button" class="chip" id="layer-phase" aria-pressed="false">Phasenraum</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const FIXED_DT = 0.001; // <= 0.002s gemäß PHYSICS_CONTRACT
+      const MASS = 1.0;       // kg
+      const HIT_RADIUS = 42;  // px (>= 36px Hitbox für Finger)
+      const MAX_TRAIL = 220;
+      const MAX_PHASE = 1400;
+
+      const PRESETS = {
+        "ungedaempft": { L: 1.20, g: 9.81, gamma: 0.00, phi: 0.60, omega: 0, vectors: true, energy: true, phase: false },
+        "stark-gedaempft": { L: 1.20, g: 9.81, gamma: 0.55, phi: 1.15, omega: 0, vectors: false, energy: true, phase: true },
+        "mond": { L: 1.20, g: 1.62, gamma: 0.00, phi: 0.60, omega: 0, vectors: true, energy: true, phase: false },
+        "jupiter": { L: 1.20, g: 24.79, gamma: 0.00, phi: 0.60, omega: 0, vectors: true, energy: true, phase: false }
+      };
+
+      const canvas = document.getElementById("sim-canvas");
+      const ctx = canvas.getContext("2d");
+
+      const hud = document.getElementById("hud");
+      const toggleHudBtn = document.getElementById("toggle-hud-btn");
+      const playBtn = document.getElementById("play-btn");
+      const resetBtn = document.getElementById("reset-btn");
+      const clearBtn = document.getElementById("clear-btn");
+
+      const slL = document.getElementById("sl-L");
+      const slG = document.getElementById("sl-g");
+      const slGamma = document.getElementById("sl-gamma");
+
+      const lblL = document.getElementById("lbl-L");
+      const lblG = document.getElementById("lbl-g");
+      const lblGamma = document.getElementById("lbl-gamma");
+
+      const valPhi = document.getElementById("val-phi");
+      const valOmega = document.getElementById("val-omega");
+      const valPeriod = document.getElementById("val-period");
+      const presetBadge = document.getElementById("preset-badge");
+      const valPreset = document.getElementById("val-preset");
+
+      const btnVectors = document.getElementById("layer-vectors");
+      const btnEnergy = document.getElementById("layer-energy");
+      const btnPhase = document.getElementById("layer-phase");
+
+      const state = {
+        L: 1.20,
+        g: 9.81,
+        gamma: 0.08,
+        phi: 0.58,
+        omega: 0,
+        eRef: 0,
+        eTherm: 0,
+        running: true,
+        showVectors: true,
+        showEnergy: true,
+        showPhase: false,
+        dragging: false,
+        hovered: false,
+        activePointerId: null,
+        dragHistory: [],
+        trail: [],
+        phaseTrail: [],
+        initialPhi: 0.58,
+        initialOmega: 0
+      };
+
+      let viewW = 0;
+      let viewH = 0;
+      let dpr = 1;
+      let accTime = 0;
+      let lastFrameTime = performance.now();
+
+      function clamp(val, lo, hi) {
+        return Math.max(lo, Math.min(hi, val));
+      }
+
+      function normalizeAngle(rad) {
+        let a = rad;
+        while (a > Math.PI) a -= 2 * Math.PI;
+        while (a < -Math.PI) a += 2 * Math.PI;
+        return a;
+      }
+
+      function computeEnergy(phi, omega) {
+        const ePot = MASS * state.g * state.L * (1 - Math.cos(phi));
+        const v = state.L * omega;
+        const eKin = 0.5 * MASS * v * v;
+        return { ePot, eKin, eMech: ePot + eKin };
+      }
+
+      function syncEnergyReference() {
+        const e = computeEnergy(state.phi, state.omega);
+        state.eRef = Math.max(e.eMech, 0.05);
+        state.eTherm = 0;
+      }
+
+      function applyQueryParams() {
+        const params = new URLSearchParams(window.location.search);
+        const presetName = params.get("preset");
+        if (presetName && PRESETS[presetName]) {
+          const p = PRESETS[presetName];
+          state.L = p.L;
+          state.g = p.g;
+          state.gamma = p.gamma;
+          state.phi = p.phi;
+          state.omega = p.omega;
+          state.initialPhi = p.phi;
+          state.initialOmega = p.omega;
+          state.showVectors = p.vectors;
+          state.showEnergy = p.energy;
+          state.showPhase = p.phase;
+          presetBadge.hidden = false;
+          valPreset.textContent = presetName;
+        }
+
+        const numParam = (name, lo, hi) => {
+          if (!params.has(name)) return null;
+          const v = Number(params.get(name));
+          return Number.isFinite(v) ? clamp(v, lo, hi) : null;
+        };
+
+        const qL = numParam("L", 0.40, 2.50);
+        const qG = numParam("g", 1.62, 24.79);
+        const qGamma = numParam("gamma", 0.00, 1.20);
+        const qPhi = numParam("phi", -Math.PI, Math.PI);
+        const qOmega = numParam("omega", -12, 12);
+
+        if (qL !== null) state.L = qL;
+        if (qG !== null) state.g = qG;
+        if (qGamma !== null) state.gamma = qGamma;
+        if (qPhi !== null) {
+          state.phi = qPhi;
+          state.initialPhi = qPhi;
+        }
+        if (qOmega !== null) {
+          state.omega = qOmega;
+          state.initialOmega = qOmega;
+        }
+
+        if (params.has("vectors")) state.showVectors = params.get("vectors") !== "0";
+        if (params.has("energy")) state.showEnergy = params.get("energy") !== "0";
+        if (params.has("phase")) state.showPhase = params.get("phase") !== "0";
+      }
+
+      function syncUIFromState() {
+        slL.value = state.L.toFixed(2);
+        slG.value = state.g.toFixed(2);
+        slGamma.value = state.gamma.toFixed(2);
+        lblL.textContent = state.L.toFixed(2) + " m";
+        lblG.textContent = state.g.toFixed(2) + " m/s²";
+        lblGamma.textContent = state.gamma.toFixed(2) + " s⁻¹";
+
+        btnVectors.classList.toggle("active", state.showVectors);
+        btnVectors.setAttribute("aria-pressed", String(state.showVectors));
+        btnEnergy.classList.toggle("active", state.showEnergy);
+        btnEnergy.setAttribute("aria-pressed", String(state.showEnergy));
+        btnPhase.classList.toggle("active", state.showPhase);
+        btnPhase.setAttribute("aria-pressed", String(state.showPhase));
+      }
+
+      function getLayout() {
+        const hudVisible = !hud.classList.contains("collapsed");
+        const topPad = 78;
+        const bottomPad = hudVisible ? (viewW < 680 ? 255 : 152) : 28;
+        const availH = Math.max(200, viewH - topPad - bottomPad);
+        const pxPerMeter = clamp(Math.min(availH * 0.72 / 2.5, viewW * 0.34 / 2.5), 75, 195);
+        const pivotX = state.showPhase && viewW >= 820 ? viewW * 0.38 : viewW * 0.5;
+        const pivotY = topPad + Math.max(28, availH * 0.14);
+        const ropePx = state.L * pxPerMeter;
+        const bobX = pivotX + ropePx * Math.sin(state.phi);
+        const bobY = pivotY + ropePx * Math.cos(state.phi);
+        return { pivotX, pivotY, pxPerMeter, ropePx, bobX, bobY, topPad, bottomPad };
+      }
+
+      // RK4-Schritt für φ'' = -(g/L) sin(φ) - γ φ'
+      function deriv(phi, omega) {
+        const alpha = -(state.g / state.L) * Math.sin(phi) - state.gamma * omega;
+        return [omega, alpha];
+      }
+
+      function stepRK4(dt) {
+        const p = state.phi;
+        const w = state.omega;
+        const eBefore = computeEnergy(p, w).eMech;
+
+        const [k1p, k1w] = deriv(p, w);
+        const [k2p, k2w] = deriv(p + 0.5 * dt * k1p, w + 0.5 * dt * k1w);
+        const [k3p, k3w] = deriv(p + 0.5 * dt * k2p, w + 0.5 * dt * k2w);
+        const [k4p, k4w] = deriv(p + dt * k3p, w + dt * k3w);
+
+        state.phi = normalizeAngle(p + (dt / 6) * (k1p + 2 * k2p + 2 * k3p + k4p));
+        state.omega = w + (dt / 6) * (k1w + 2 * k2w + 2 * k3w + k4w);
+
+        const eAfter = computeEnergy(state.phi, state.omega).eMech;
+        const dDiss = Math.max(0, eBefore - eAfter);
+        state.eTherm += dDiss;
+      }
+
+      function recordTrails(layout) {
+        state.trail.push({ x: layout.bobX, y: layout.bobY });
+        if (state.trail.length > MAX_TRAIL) state.trail.shift();
+
+        state.phaseTrail.push({ phi: state.phi, omega: state.omega });
+        if (state.phaseTrail.length > MAX_PHASE) state.phaseTrail.shift();
+      }
+
+      function drawArrow(x1, y1, x2, y2, color, label, dashed) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.hypot(dx, dy);
+        if (len < 6) return;
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = 2.4;
+        if (dashed) ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const ang = Math.atan2(dy, dx);
+        const head = Math.min(11, Math.max(7, len * 0.25));
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - head * Math.cos(ang - 0.42), y2 - head * Math.sin(ang - 0.42));
+        ctx.lineTo(x2 - head * Math.cos(ang + 0.42), y2 - head * Math.sin(ang + 0.42));
+        ctx.closePath();
+        ctx.fill();
+
+        if (label) {
+          ctx.font = "600 12px -apple-system, BlinkMacSystemFont, sans-serif";
+          const nx = -dy / len;
+          const ny = dx / len;
+          ctx.fillText(label, x2 + nx * 12 + 4, y2 + ny * 12 + 4);
+        }
+        ctx.restore();
+      }
+
+      function drawEnergyPanel(layout) {
+        const e = computeEnergy(state.phi, state.omega);
+        const totalRef = Math.max(state.eRef, e.eMech + state.eTherm, 0.1);
+        const w = Math.min(230, viewW * 0.36);
+        const h = 118;
+        const x = 14;
+        const y = layout.topPad + 10;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(15, 23, 42, 0.78)";
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.24)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "700 12px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.fillText("Energiebilanz (m = 1,0 kg)", x + 12, y + 20);
+
+        const bars = [
+          { label: "E_pot", val: e.ePot, color: "#fbbf24" },
+          { label: "E_kin", val: e.eKin, color: "#38bdf8" },
+          { label: "E_therm", val: state.eTherm, color: "#fb7185" }
+        ];
+
+        const barX = x + 68;
+        const maxBarW = w - 126;
+        bars.forEach((b, idx) => {
+          const rowY = y + 36 + idx * 24;
+          ctx.fillStyle = "#94a3b8";
+          ctx.font = "600 11px ui-monospace, SFMono-Regular, monospace";
+          ctx.fillText(b.label, x + 12, rowY + 11);
+
+          ctx.fillStyle = "rgba(148, 163, 184, 0.15)";
+          ctx.beginPath();
+          ctx.roundRect(barX, rowY + 2, maxBarW, 10, 5);
+          ctx.fill();
+
+          const fillW = clamp((b.val / totalRef) * maxBarW, 0, maxBarW);
+          if (fillW > 0.5) {
+            ctx.fillStyle = b.color;
+            ctx.beginPath();
+            ctx.roundRect(barX, rowY + 2, fillW, 10, 5);
+            ctx.fill();
+          }
+
+          ctx.fillStyle = "#cbd5e1";
+          ctx.textAlign = "right";
+          ctx.fillText(b.val.toFixed(2) + " J", x + w - 10, rowY + 11);
+          ctx.textAlign = "left";
+        });
+        ctx.restore();
+      }
+
+      function drawPhasePanel(layout) {
+        const isWide = viewW >= 820;
+        const size = isWide ? Math.min(280, viewW * 0.28, viewH * 0.44) : Math.min(185, viewW * 0.42);
+        const x = viewW - size - 14;
+        const y = layout.topPad + 10;
+
+        ctx.save();
+        ctx.fillStyle = "rgba(15, 23, 42, 0.82)";
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.26)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, size, size, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "700 12px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.fillText("Phasenraum (φ, ω)", x + 12, y + 20);
+
+        const cx = x + size * 0.5;
+        const cy = y + size * 0.54;
+        const pad = 26;
+        const rx = size * 0.5 - pad;
+        const ry = size * 0.5 - pad - 6;
+
+        const maxPhi = Math.PI;
+        const maxOmega = Math.max(4.5, Math.sqrt((4 * state.g) / state.L) * 1.1);
+
+        // Achsen
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx - rx, cy);
+        ctx.lineTo(cx + rx, cy);
+        ctx.moveTo(cx, cy - ry);
+        ctx.lineTo(cx, cy + ry);
+        ctx.stroke();
+
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "10px ui-monospace, SFMono-Regular, monospace";
+        ctx.fillText("φ", cx + rx - 6, cy - 5);
+        ctx.fillText("ω", cx + 5, cy - ry + 8);
+
+        // Phasenbahn
+        if (state.phaseTrail.length > 1) {
+          ctx.strokeStyle = "rgba(167, 139, 250, 0.85)";
+          ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          let started = false;
+          let prevPhi = state.phaseTrail[0].phi;
+          for (let i = 0; i < state.phaseTrail.length; i++) {
+            const pt = state.phaseTrail[i];
+            const px = cx + (pt.phi / maxPhi) * rx;
+            const py = cy - clamp(pt.omega / maxOmega, -1.1, 1.1) * ry;
+            if (!started || Math.abs(pt.phi - prevPhi) > Math.PI) {
+              ctx.moveTo(px, py);
+              started = true;
+            } else {
+              ctx.lineTo(px, py);
+            }
+            prevPhi = pt.phi;
+          }
+          ctx.stroke();
+        }
+
+        // Aktueller Punkt
+        const dotX = cx + (state.phi / maxPhi) * rx;
+        const dotY = cy - clamp(state.omega / maxOmega, -1.1, 1.1) * ry;
+        ctx.fillStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, viewW, viewH);
+        const layout = getLayout();
+
+        // Dezenter Referenzkreis und Ruhelage
+        ctx.save();
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.12)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 6]);
+        ctx.beginPath();
+        ctx.arc(layout.pivotX, layout.pivotY, layout.ropePx, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(layout.pivotX, layout.pivotY);
+        ctx.lineTo(layout.pivotX, layout.pivotY + layout.ropePx + 18);
+        ctx.stroke();
+        ctx.restore();
+
+        // Winkelbogen
+        if (Math.abs(state.phi) > 0.02) {
+          ctx.save();
+          const arcR = Math.min(46, layout.ropePx * 0.35);
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.45)";
+          ctx.fillStyle = "rgba(56, 189, 248, 0.12)";
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(layout.pivotX, layout.pivotY);
+          const startA = Math.PI / 2;
+          const endA = Math.PI / 2 - state.phi;
+          ctx.arc(layout.pivotX, layout.pivotY, arcR, startA, endA, state.phi > 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Bewegungsspur
+        if (state.trail.length > 1) {
+          ctx.save();
+          for (let i = 1; i < state.trail.length; i++) {
+            const alpha = (i / state.trail.length) * 0.48;
+            ctx.strokeStyle = `rgba(56, 189, 248, ${alpha.toFixed(3)})`;
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.moveTo(state.trail[i - 1].x, state.trail[i - 1].y);
+            ctx.lineTo(state.trail[i].x, state.trail[i].y);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // Aufhängung & Faden
+        ctx.save();
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.moveTo(layout.pivotX - 28, layout.pivotY - 2);
+        ctx.lineTo(layout.pivotX + 28, layout.pivotY - 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(layout.pivotX, layout.pivotY);
+        ctx.lineTo(layout.bobX, layout.bobY);
+        ctx.stroke();
+
+        ctx.fillStyle = "#e2e8f0";
+        ctx.beginPath();
+        ctx.arc(layout.pivotX, layout.pivotY, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Vektoren
+        if (state.showVectors) {
+          const forceScale = 5.2; // px pro Newton
+          const fg = MASS * state.g;
+          const ft = -fg * Math.sin(state.phi);
+          const tx = Math.cos(state.phi);
+          const ty = -Math.sin(state.phi);
+
+          // Gewichtskraft F_G (gestrichelt, bernstein)
+          drawArrow(layout.bobX, layout.bobY, layout.bobX, layout.bobY + fg * forceScale, "#fbbf24", "F_G", true);
+          // Tangentiale Rückstellkraft F_t
+          drawArrow(layout.bobX, layout.bobY, layout.bobX + ft * forceScale * tx, layout.bobY + ft * forceScale * ty, "#fb7185", "F_t", false);
+
+          // Geschwindigkeit v
+          const v = state.L * state.omega;
+          const vScale = 22;
+          drawArrow(layout.bobX, layout.bobY, layout.bobX + v * vScale * tx, layout.bobY + v * vScale * ty, "#38bdf8", "v", false);
+        }
+
+        // Pendelmasse (Bob)
+        ctx.save();
+        if (state.dragging || state.hovered) {
+          ctx.fillStyle = "rgba(56, 189, 248, 0.18)";
+          ctx.beginPath();
+          ctx.arc(layout.bobX, layout.bobY, 32, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        const grad = ctx.createRadialGradient(layout.bobX - 5, layout.bobY - 6, 2, layout.bobX, layout.bobY, 20);
+        grad.addColorStop(0, "#bae6fd");
+        grad.addColorStop(0.55, "#38bdf8");
+        grad.addColorStop(1, "#0284c7");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(layout.bobX, layout.bobY, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#e0f2fe";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+
+        // Analytische Overlays
+        if (state.showEnergy) drawEnergyPanel(layout);
+        if (state.showPhase) drawPhasePanel(layout);
+
+        // Live-Readout (SI)
+        const deg = (state.phi * 180) / Math.PI;
+        const T0 = 2 * Math.PI * Math.sqrt(state.L / state.g);
+        valPhi.textContent = `${deg.toFixed(1)}° (${state.phi.toFixed(2)} rad)`;
+        valOmega.textContent = `${state.omega.toFixed(2)} rad/s`;
+        valPeriod.textContent = `${T0.toFixed(2)} s`;
+      }
+
+      // Pointer Events (Touch & Maus einheitlich)
+      function pointerCoords(ev) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+      }
+
+      function updateDragAngle(px, py, nowMs) {
+        const layout = getLayout();
+        const rawPhi = Math.atan2(px - layout.pivotX, py - layout.pivotY);
+        const newPhi = normalizeAngle(rawPhi);
+        state.dragHistory.push({ phi: newPhi, t: nowMs });
+        if (state.dragHistory.length > 6) state.dragHistory.shift();
+        state.phi = newPhi;
+        state.omega = 0;
+        syncEnergyReference();
+      }
+
+      canvas.addEventListener("pointerdown", function (ev) {
+        if (state.activePointerId !== null) return;
+        const { x, y } = pointerCoords(ev);
+        const layout = getLayout();
+        const dist = Math.hypot(x - layout.bobX, y - layout.bobY);
+        if (dist <= HIT_RADIUS) {
+          state.dragging = true;
+          state.activePointerId = ev.pointerId;
+          state.dragHistory = [];
+          state.trail = [];
+          canvas.classList.add("dragging");
+          canvas.setPointerCapture(ev.pointerId);
+          updateDragAngle(x, y, performance.now());
+        }
+      });
+
+      canvas.addEventListener("pointermove", function (ev) {
+        const { x, y } = pointerCoords(ev);
+        if (state.dragging && ev.pointerId === state.activePointerId) {
+          updateDragAngle(x, y, performance.now());
+          return;
+        }
+        const layout = getLayout();
+        state.hovered = Math.hypot(x - layout.bobX, y - layout.bobY) <= HIT_RADIUS;
+      });
+
+      function endDrag(ev) {
+        if (!state.dragging || ev.pointerId !== state.activePointerId) return;
+        const now = performance.now();
+        // Anschub-Geschwindigkeit aus den letzten 80ms schätzen
+        if (state.dragHistory.length >= 2) {
+          const newest = state.dragHistory[state.dragHistory.length - 1];
+          const oldest = state.dragHistory[0];
+          const dtSec = (newest.t - oldest.t) / 1000;
+          if (now - newest.t < 90 && dtSec > 0.008) {
+            const dPhi = normalizeAngle(newest.phi - oldest.phi);
+            state.omega = clamp(dPhi / dtSec, -10, 10);
+          } else {
+            state.omega = 0;
+          }
+        }
+        syncEnergyReference();
+        state.dragging = false;
+        state.activePointerId = null;
+        canvas.classList.remove("dragging");
+        if (canvas.hasPointerCapture(ev.pointerId)) {
+          canvas.releasePointerCapture(ev.pointerId);
+        }
+      }
+
+      canvas.addEventListener("pointerup", endDrag);
+      canvas.addEventListener("pointercancel", endDrag);
+
+      // UI Events
+      slL.addEventListener("input", function () {
+        state.L = parseFloat(slL.value);
+        lblL.textContent = state.L.toFixed(2) + " m";
+        syncEnergyReference();
+      });
+
+      slG.addEventListener("input", function () {
+        state.g = parseFloat(slG.value);
+        lblG.textContent = state.g.toFixed(2) + " m/s²";
+        syncEnergyReference();
+      });
+
+      slGamma.addEventListener("input", function () {
+        state.gamma = parseFloat(slGamma.value);
+        lblGamma.textContent = state.gamma.toFixed(2) + " s⁻¹";
+        syncEnergyReference();
+      });
+
+      playBtn.addEventListener("click", function () {
+        state.running = !state.running;
+        playBtn.textContent = state.running ? "Pause" : "Weiter";
+      });
+
+      resetBtn.addEventListener("click", function () {
+        state.phi = state.initialPhi;
+        state.omega = state.initialOmega;
+        state.trail = [];
+        state.phaseTrail = [];
+        syncEnergyReference();
+      });
+
+      clearBtn.addEventListener("click", function () {
+        state.trail = [];
+        state.phaseTrail = [];
+      });
+
+      toggleHudBtn.addEventListener("click", function () {
+        const collapsed = hud.classList.toggle("collapsed");
+        toggleHudBtn.textContent = collapsed ? "HUD einblenden" : "HUD ausblenden";
+        toggleHudBtn.setAttribute("aria-expanded", String(!collapsed));
+      });
+
+      function bindLayerToggle(btn, prop) {
+        btn.addEventListener("click", function () {
+          state[prop] = !state[prop];
+          btn.classList.toggle("active", state[prop]);
+          btn.setAttribute("aria-pressed", String(state[prop]));
+        });
+      }
+
+      bindLayerToggle(btnVectors, "showVectors");
+      bindLayerToggle(btnEnergy, "showEnergy");
+      bindLayerToggle(btnPhase, "showPhase");
+
+      // Retina ResizeObserver
+      function updateCanvasSize() {
+        const rect = canvas.getBoundingClientRect();
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        viewW = rect.width;
+        viewH = rect.height;
+        canvas.width = Math.round(viewW * dpr);
+        canvas.height = Math.round(viewH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      const ro = new ResizeObserver(updateCanvasSize);
+      ro.observe(canvas);
+
+      function tick(now) {
+        const frameDt = Math.min((now - lastFrameTime) / 1000, 0.05);
+        lastFrameTime = now;
+
+        if (state.running && !state.dragging) {
+          accTime += frameDt;
+          while (accTime >= FIXED_DT) {
+            stepRK4(FIXED_DT);
+            accTime -= FIXED_DT;
+          }
+          recordTrails(getLayout());
+        } else {
+          accTime = 0;
+        }
+
+        render();
+        requestAnimationFrame(tick);
+      }
+
+      applyQueryParams();
+      syncUIFromState();
+      updateCanvasSize();
+      syncEnergyReference();
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
